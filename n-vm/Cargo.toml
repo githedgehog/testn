@@ -1,13 +1,12 @@
 [package]
-name = "testnvm"
-version = "0.0.1"
+name = "n-vm"
+version = "0.0.0"
 edition = "2024"
 license = "Apache-2.0"
 publish = false
 
 [dependencies]
 # external
-linkme = { version = "0.3.33", default-features = false, features = [] }
 cloud-hypervisor-client = "0.3.3"
 serde = { workspace = true, default-features = false, features = ["derive"] }
 tokio-stream.workspace = true

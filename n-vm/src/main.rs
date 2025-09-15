@@ -508,7 +508,7 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
                 entrypoint: None,
                 cmd: Some(args),
                 // TODO: this needs to be dynamic somehow.  Not sure how to do that yet.
-                image: Some("vm-runner2:latest".into()),
+                image: Some("ghcr.io/githedgehog/testin/n-vm:latest".into()),
                 network_disabled: Some(true),
                 env: Some([
                     "IN_TEST_CONTAINER=YES".into(),

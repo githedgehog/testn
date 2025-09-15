@@ -1,13 +1,9 @@
 [package]
-name = "testnit"
+name = "n-it"
 version = "0.0.0"
 edition = "2024"
 license = "Apache-2.0"
 publish = false
-
-[[bin]]
-name = "testnit"
-path = "src/testnit.rs"
 
 [dependencies]
 
