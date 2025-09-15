@@ -1,0 +1,24 @@
+[package]
+name = "testn-init"
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[[bin]]
+name = "vm-init"
+path = "src/vm-init.rs"
+
+[[bin]]
+name = "container-init"
+path = "src/container-init.rs"
+
+[dependencies]
+
+# external
+nix = { workspace = true, default-features = false, features = ["signal", "mount", "reboot", "fs"] }
+tokio = { workspace = true, default-features = false, features = ["rt", "process", "signal", "time", "macros", "fs", "sync", "net", "io-util"] }
+tokio-vsock = { workspace = true, default-features = false, features = [] }
+vsock = { workspace = true, default-features = false, features = [] }
+tracing = { workspace = true, default-features = false, features = ["attributes"] }
+tracing-subscriber = { workspace = true, default-features = false, features = ["fmt"] }
