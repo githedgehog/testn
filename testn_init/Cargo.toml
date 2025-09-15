@@ -1,5 +1,5 @@
 [package]
-name = "testn-init"
+name = "testn_nit"
 version = "0.0.0"
 edition = "2024"
 license = "Apache-2.0"

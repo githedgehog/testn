@@ -456,14 +456,14 @@ async fn watch_hypervisor(
     return (hlog, success);
 }
 
-pub fn run_in_vm_runner_container<F: FnOnce()>(_test_fn: F) -> ContainerState {
+pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
     runtime.block_on(async {
         const REQUIRED_CAPS: [&str; 6] = [
-            "CAP_SYS_CHROOT", // for chroot (required by virtiofsd)
+            "SYS_CHROOT", // for chroot (required by virtiofsd)
             "SYS_RAWIO", // for af-packet
             "IPC_LOCK", // for hugepages
             "NET_ADMIN", // to test creation / configuration of network interfaces and to create tap devices to hook to the vm
@@ -471,19 +471,15 @@ pub fn run_in_vm_runner_container<F: FnOnce()>(_test_fn: F) -> ContainerState {
             "NET_BIND_SERVICE", // for vsockets
         ];
         const REQUIRED_DEVICES: [&str; 4] = ["/dev/kvm", "/dev/vhost-vsock", "/dev/vhost-net", "/dev/net/tun"];
-        const REQUIRED_FILES: [&str; 4] = [
-            "/dev/kvm",             // to launch vms
-            "/dev/vhost-vsock",     // for vhost communication with the vm
-            "/dev/vhost-net",       // for vsock communication with the vm
-            "/var/run/docker.sock", // allows the launch of sibling containers (may not be needed)
+        const REQUIRED_FILES: [&str; 2] = [
+            "/dev/kvm", // to launch vms
+            "/dev/vhost-vsock", // for vhost communication with the vm
+            // "/dev/vhost-net", // for vsock communication with the vm (not yet needed)
+            // "/var/run/docker.sock", // allows the launch of sibling containers (may not be needed)
         ];
         let (_, test_name) = std::any::type_name::<F>().split_once("::").unwrap();
         let bin_path = std::fs::read_link("/proc/self/exe").unwrap();
         let bin_dir = std::fs::canonicalize(bin_path.parent().unwrap()).unwrap();
-        // let vm_root = "/run/user/1000/vm_root".to_string();
-        // let vm_root = "/vm.root".to_string();
-        // TODO: some invokes care about arg0 name (e.g. coreutils).  Need to pass that in somehow but it is hard to give this data to docker
-        // let bin_invoked_as = std::env::args().next().unwrap();
         let client = bollard::Docker::connect_with_unix_defaults().unwrap();
         use std::os::unix::fs::MetadataExt;
         let cap_add = REQUIRED_CAPS.map(|cap| cap.into()).into();
@@ -698,7 +694,7 @@ mod test {
             }
         }
         eprintln!("•─────⋅☾☾☾☾BEGIN NESTED TEST ENVIRONMENT☽☽☽☽⋅─────•");
-        let container_state = super::run_in_vm_runner_container(container_biscuit);
+        let container_state = super::run_test_in_vm(container_biscuit);
         eprintln!("•─────⋅☾☾☾☾END NESTED TEST ENVIRONMENT☽☽☽☽⋅─────•");
         if __user_defined::SHOULD_PANIC {
             if let Some(code) = container_state.exit_code {

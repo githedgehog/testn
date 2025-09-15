@@ -1,6 +1,6 @@
 // NOTE: do not call `panic!` anywhere in this file.  Instead, use the `fatal!` macro.
 // It is important that we flush stdout and stderr before exiting, and panic!
-// may not do that correctly in the case of an init system.
+// does not do that correctly in the case of an init system.
 #[macro_export]
 macro_rules! fatal {
     ($msg:expr) => {

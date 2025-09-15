@@ -21,13 +21,11 @@ mod utils;
 
 #[derive(Debug)]
 #[non_exhaustive]
-struct InitSystem {}
+struct InitSystem;
 
 impl InitSystem {
     fn mount_essential_filesystems() -> Result<(), std::io::Error> {
-        // Mount /proc with security options
-        debug!("mounting /proc");
-        fn fail_on_mount(mount: &'static str, e: Errno) -> ! {
+        fn fail_to_mount(mount: &'static str, e: Errno) -> ! {
             match e {
                 Errno::UnknownErrno => {
                     fatal!("unknown error while mounting {mount}");
@@ -40,6 +38,9 @@ impl InitSystem {
                 }
             }
         }
+
+        // Mount /proc with security options
+        debug!("mounting /proc");
         if let Err(e) = mount(
             Some("proc"),
             "/proc",
@@ -47,7 +48,7 @@ impl InitSystem {
             MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             None::<&str>,
         ) {
-            fail_on_mount("/proc", e)
+            fail_to_mount("/proc", e)
         };
 
         // Mount /sys with security options
@@ -59,21 +60,10 @@ impl InitSystem {
             MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             None::<&str>,
         ) {
-            fail_on_mount("/sys", e)
+            fail_to_mount("/sys", e)
         }
 
         // no need to mount /dev because CONFIG_DEVTMPFS_MOUNT is enabled in the kernel.  /dev is auto mounted
-        // // Mount /dev with appropriate options
-        // debug!("mounting /dev");
-        // if let Err(e) = mount(
-        //     Some("devtmpfs"),
-        //     "/dev",
-        //     Some("devtmpfs"),
-        //     MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC,
-        //     Some("mode=0755,size=10M"),
-        // ) {
-        //     fail_on_mount("/dev", e)
-        // };
 
         // Mount /tmp as tmpfs
         debug!("mounting /tmp");
@@ -82,9 +72,9 @@ impl InitSystem {
             "/tmp",
             Some("tmpfs"),
             MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
-            Some("mode=1777,size=5%"),
+            Some("mode=0300,size=5%"),
         ) {
-            fail_on_mount("/tmp", e)
+            fail_to_mount("/tmp", e)
         };
 
         // Mount /run as tmpfs
@@ -94,9 +84,9 @@ impl InitSystem {
             "/run",
             Some("tmpfs"),
             MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
-            Some("mode=0755,size=5%"),
+            Some("mode=0300,size=5%"),
         ) {
-            fail_on_mount("/run", e)
+            fail_to_mount("/run", e)
         }
 
         // Mount /sys/fs/group with security options
@@ -108,20 +98,8 @@ impl InitSystem {
             MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
             Some("nsdelegate,memory_recursiveprot"),
         ) {
-            fail_on_mount("/sys/fs/cgroup", e)
+            fail_to_mount("/sys/fs/cgroup", e)
         }
-
-        // // Mount /project as virtiofs
-        // debug!("mounting /project");
-        // if let Err(e) = mount(
-        //     Some("/dev/project"),
-        //     "/project",
-        //     Some("virtiofs"),
-        //     MsFlags::MS_NOSUID | MsFlags::MS_NODEV | MsFlags::MS_RDONLY,
-        //     None::<&str>,
-        // ) {
-        //     fail_on_mount("/project", e)
-        // }
 
         debug!("all essential filesystems mounted successfully");
         Ok(())
@@ -131,10 +109,6 @@ impl InitSystem {
         debug!("spawning main process");
 
         let mut args = std::env::args();
-        if args.len() == 0 {
-            fatal!("no arguments provided to init process: no main process specified");
-        }
-
         if args.len() < 2 {
             fatal!("no main process specified to init process");
         }
@@ -156,7 +130,6 @@ impl InitSystem {
             .stdin(Stdio::inherit())
             .stderr(console.try_clone().await.unwrap().into_std().await)
             .stdout(console.try_clone().await.unwrap().into_std().await)
-            // .current_dir("/project")
             .env("IN_VM", "YES")
             .env("PATH", "/bin")
             .spawn()
@@ -171,20 +144,24 @@ impl InitSystem {
     }
 
     /// Reaps all orphaned child processes.
+    ///
+    /// Returns None if all processes exited cleanly, Some(()) if any process exited with error or was killed by signal.
+    /// This is important because if the test is leaking processes that is a failure criteria.
     #[tracing::instrument(level = "debug")]
-    fn reap() -> bool {
+    fn reap() -> Option<()> {
         let mut success = true;
         const ANY_CHILD: Pid = Pid::from_raw(-1);
-
         loop {
             match waitpid(ANY_CHILD, Some(WaitPidFlag::WNOHANG)) {
                 Ok(WaitStatus::Exited(pid, status)) => {
                     if status != 0 {
                         warn!("orphaned process {pid} exited with status {status}");
+                        success = false;
                     }
                 }
                 Ok(WaitStatus::Signaled(pid, signal, _)) => {
                     warn!("orphaned process {pid} killed by signal {signal}");
+                    success = false;
                 }
                 Ok(WaitStatus::StillAlive) => {
                     break;
@@ -199,13 +176,13 @@ impl InitSystem {
                 }
             }
         }
-        success
+        if success { None } else { Some(()) }
     }
 
     /// Send signal to all processes except init (PID 1)
-    /// Using PID -1 means "all processes that the calling process has permission to send signals to"
     #[tracing::instrument(level = "info")]
     fn send_signal_to_all_processes(signal: Signal) -> Option<()> {
+        // Using PID -1 means "all processes that the calling process has permission to send signals to"
         match kill(Pid::from_raw(-1), signal) {
             Ok(()) => {
                 trace!("successfully sent {signal:?} to all processes");
@@ -226,14 +203,17 @@ impl InitSystem {
         }
     }
 
+    // Terminate all remaining processes, first with SIGTERM
+    //
+    // Returns None if no processes were remaining, Some(()) if processes were terminated (even if unsuccessfully)
     #[tracing::instrument(level = "info")]
-    async fn terminate_remaining_processes() -> bool {
+    async fn terminate_remaining_processes() -> Option<()> {
         const MAX_SIGTERM_ATTEMPTS: u8 = 50;
-        if list_child_processes().await.is_empty() {
+        if Self::list_child_processes().await.is_empty() {
             trace!("no child processes remaining");
-            return true;
+            return None;
         }
-        if !Self::reap() {
+        if let Some(()) = Self::reap() {
             warn!("test seems to be leaking processes");
         }
         // Send SIGTERM to all processes
@@ -244,27 +224,28 @@ impl InitSystem {
         {
             sigs += 1;
             sleep(Duration::from_millis(10)).await;
-            if !Self::reap() {
+            if let Some(()) = Self::reap() {
                 error!("test is leaking processes");
             }
-            if list_child_processes().await.is_empty() {
+            if Self::list_child_processes().await.is_empty() {
                 debug!("no child processes remaining");
-                return false;
+                return Some(());
             }
         }
         error!("maximum SIGTERM attempts reached: test did not shut down correctly");
-        return false;
+        return Some(());
     }
 
     #[tracing::instrument(level = "info")]
     fn unmount_filesystems() {
+        debug!("syncing filesystems");
         sync();
-        debug!("unmounting filesystems");
+        debug!("umounting filesystems");
         // Unmount in reverse order of mounting
         const MOUNTS_TO_UNMOUNT: [&str; 5] = ["/run", "/tmp", "/sys/fs/cgroup", "/sys", "/proc"];
 
         for mount_point in MOUNTS_TO_UNMOUNT {
-            debug!("unmounting {mount_point}");
+            debug!("umounting {mount_point}");
             sync();
             loop {
                 match nix::mount::umount2(mount_point, MntFlags::MNT_DETACH) {
@@ -279,8 +260,7 @@ impl InitSystem {
                         std::thread::sleep(Duration::from_millis(1));
                     }
                     Err(Errno::EINVAL) => {
-                        warn!("{mount_point} not mounted or invalid");
-                        break;
+                        fatal!("{mount_point} not mounted or invalid");
                     }
                     Err(e) => {
                         fatal!("failed to unmount {mount_point}: {e}");
@@ -288,7 +268,9 @@ impl InitSystem {
                 }
             }
         }
-        debug!("filesystem unmounting completed");
+        debug!("filesystem umounting completed");
+        debug!("final sync");
+        sync();
     }
 
     #[tracing::instrument(level = "info")]
@@ -296,15 +278,11 @@ impl InitSystem {
         info!("beginning system shutdown");
 
         // Terminate all processes using nix signal functions
-        let success = Self::terminate_remaining_processes().await && success;
+        let success = Self::terminate_remaining_processes().await.is_none() && success;
 
         // Final sync and power off
         match tokio::task::spawn_blocking(move || {
-            debug!("syncing filesystems");
-            sync();
             Self::unmount_filesystems();
-            debug!("final sync");
-            sync();
             if success {
                 info!("powering off");
                 match reboot(RebootMode::RB_POWER_OFF) {
@@ -333,7 +311,6 @@ impl InitSystem {
     #[tracing::instrument(level = "info")]
     async fn run() -> Infallible {
         info!("starting init system");
-
         debug!("registering signal handlers");
 
         // signals to handle in init system
@@ -442,6 +419,33 @@ impl InitSystem {
         }
         InitSystem::shutdown_system(success).await
     }
+
+    async fn list_child_processes() -> Vec<Pid> {
+        let mut child_pids = tokio::fs::read_dir("/proc").await.unwrap();
+        let mut children = vec![];
+        while let Some(process) = child_pids.next_entry().await.unwrap() {
+            let Ok(pid) = process.file_name().to_string_lossy().parse::<u32>() else {
+                continue;
+            };
+            let stat = tokio::fs::read_to_string(format!("/proc/{}/stat", pid)).await;
+            let Ok(stat) = stat else {
+                continue;
+            };
+            let Some(ppid) = stat.split_whitespace().nth(3) else {
+                continue;
+            };
+            let Ok(ppid) = ppid.parse::<u32>() else {
+                continue;
+            };
+            if ppid == 1 {
+                if pid > i32::MAX as u32 {
+                    fatal!("pid overflow");
+                }
+                children.push(Pid::from_raw(pid as i32));
+            }
+        }
+        return children;
+    }
 }
 
 pub struct VsockWriter(RefCell<vsock::VsockStream>);
@@ -505,28 +509,4 @@ fn main() -> Infallible {
         }
         InitSystem::run().await
     })
-}
-
-async fn list_child_processes() -> Vec<u32> {
-    let mut child_pids = tokio::fs::read_dir("/proc").await.unwrap();
-    let mut children = vec![];
-    while let Ok(Some(process)) = child_pids.next_entry().await {
-        let Ok(pid) = process.file_name().to_string_lossy().parse::<u32>() else {
-            continue;
-        };
-        let stat = tokio::fs::read_to_string(format!("/proc/{}/stat", pid)).await;
-        let Ok(stat) = stat else {
-            continue;
-        };
-        let Some(ppid) = stat.split_whitespace().nth(3) else {
-            continue;
-        };
-        let Ok(ppid) = ppid.parse::<u32>() else {
-            continue;
-        };
-        if ppid == 1 {
-            children.push(pid);
-        }
-    }
-    return children;
 }
