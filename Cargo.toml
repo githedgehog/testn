@@ -3,8 +3,8 @@
 resolver = "3"
 
 members = [
-    "testn_init",
-    "testn_invm",
+    "testnit",
+    "testnvm",
 ]
 
 [workspace.dependencies]

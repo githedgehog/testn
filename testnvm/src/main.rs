@@ -473,8 +473,8 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
         const REQUIRED_DEVICES: [&str; 4] = ["/dev/kvm", "/dev/vhost-vsock", "/dev/vhost-net", "/dev/net/tun"];
         const REQUIRED_FILES: [&str; 2] = [
             "/dev/kvm", // to launch vms
-            "/dev/vhost-vsock", // for vhost communication with the vm
-            // "/dev/vhost-net", // for vsock communication with the vm (not yet needed)
+            "/dev/vhost-vsock", // for vsock communication with the vm
+            // "/dev/vhost-net", // for vhost communication with the vm (not yet needed)
             // "/var/run/docker.sock", // allows the launch of sibling containers (may not be needed)
         ];
         let (_, test_name) = std::any::type_name::<F>().split_once("::").unwrap();

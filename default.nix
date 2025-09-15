@@ -2,13 +2,16 @@
   pkgs ? import <nixpkgs> { },
 }:
 let
+  get_version =
+    package:
+    (builtins.fromTOML (builtins.readFile (./. + "/${package}/" + "/Cargo.toml"))).package.version;
   build-package =
     {
       package,
       src,
       rustPlatform,
       llvmPackages,
-      rev ? "0.0.0",
+      rev ? get_version package,
     }:
     rustPlatform.buildRustPackage (final: {
       inherit src;
@@ -28,6 +31,7 @@ let
       fs.unions [
         (fs.maybeMissing ./target)
         (fs.maybeMissing ./result)
+        (fs.maybeMissing ./result-2)
         (fs.fileFilter (file: file.hasExt "nix") ./.)
       ]
     );
@@ -39,6 +43,6 @@ let
     };
 in
 {
-  testn_init = build_fn "testn_init";
-  testn_invm = build_fn "testn_invm";
+  testnit = build_fn "testnit";
+  testnvm = build_fn "testnvm";
 }

@@ -1,17 +1,13 @@
 [package]
-name = "testn_nit"
+name = "testnit"
 version = "0.0.0"
 edition = "2024"
 license = "Apache-2.0"
 publish = false
 
 [[bin]]
-name = "vm-init"
-path = "src/vm-init.rs"
-
-[[bin]]
-name = "container-init"
-path = "src/container-init.rs"
+name = "testnit"
+path = "src/testnit.rs"
 
 [dependencies]
 
