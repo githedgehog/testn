@@ -1,7 +1,7 @@
 {
   pkgs ? import <nixpkgs> { },
   stdenv ? pkgs.stdenv,
-  compiler-lib ? stdenv.cc.libc.libgcc,
+  compiler-lib ? pkgs.libgcc.libgcc,
 }:
 let
   get_version =
@@ -34,6 +34,7 @@ let
         (fs.maybeMissing ./target)
         (fs.maybeMissing ./result)
         (fs.maybeMissing ./result-2)
+        (fs.maybeMissing ./container)
         (fs.fileFilter (file: file.hasExt "nix") ./.)
       ]
     );
@@ -45,6 +46,15 @@ let
     };
 in
 rec {
+  linux = pkgs.linuxManualConfig rec {
+    version = "6.12.44";
+    src = fetchTarball {
+      url = "https://cdn.kernel.org/pub/linux/kernel/v${pkgs.lib.versions.major version}.x/linux-${version}.tar.xz";
+      sha256 = "sha256:05ad3hkpsdvn1dnzcxzasg1ag8x8rlp6jcz2lhlslr0z3sc3pfaf";
+    };
+    configfile = ./linux/kernel.config;
+    inherit stdenv;
+  };
   n-it.bin = build_fn "n-it";
   n-vm.bin = build_fn "n-vm";
   n-vm.container = pkgs.dockerTools.buildLayeredImage {
@@ -59,33 +69,41 @@ rec {
         dontUnpack = true;
         src = null;
         installPhase = ''
-          mkdir -p $out/vm_root/${stdenv.cc.libc.out}
+          mkdir -p $out/vm.root/${stdenv.cc.libc.out}
         '';
       })
+      pkgs.virtiofsd
+      pkgs.cloud-hypervisor
       n-vm.bin
       stdenv.cc.libc.out
       compiler-lib
+      linux
+      pkgs.libcap.out
+      pkgs.busybox
     ];
     fakeRootCommands = ''
       #!${pkgs.busybox}/bin/sh
+      set -euxo pipefail
       ${pkgs.busybox}/bin/mkdir -p \
         /vm \
-        /vm_root/bin \
-        /vm_root/dev \
-        /vm_root/lib \
-        /vm_root/lib64 \
-        /vm_root/nix \
-        /vm_root/proc \
-        /vm_root/run \
-        /vm_root/sys \
-        /vm_root/tmp
-      ${pkgs.rsync}/bin/rsync -rLhP ${stdenv.cc.libc.out}/ /vm_root/${stdenv.cc.libc.out}}/
-      ${pkgs.rsync}/bin/rsync -rLhP ${compiler-lib}/ /vm_root/${compiler-lib}/
-      ${pkgs.rsync}/bin/rsync -rLhP ${n-it.bin}/ /vm_root/${n-it.bin}/
-      ${pkgs.busybox}/bin/ln -s ${n-it.bin}/bin/n_it /vm_root/bin/n_it
+        /vm.root/bin \
+        /vm.root/dev \
+        /vm.root/lib \
+        /vm.root/lib64 \
+        /vm.root/nix \
+        /vm.root/proc \
+        /vm.root/run \
+        /vm.root/sys \
+        /vm.root/tmp
+      ${pkgs.rsync}/bin/rsync -rLhP ${stdenv.cc.libc.out}/ /vm.root/${stdenv.cc.libc.out}/
+      ${pkgs.rsync}/bin/rsync -rLhP ${compiler-lib.lib}/ /vm.root/${compiler-lib.lib}/
+      ${pkgs.rsync}/bin/rsync -rLhP ${n-it.bin}/ /vm.root/${n-it.bin}/
+      ${pkgs.busybox}/bin/ln -s ${n-it.bin}/bin/n-it /vm.root/bin/n-it
       # populate symlinks or we can't find the dynamic linker
-      ${pkgs.rsync}/bin/rsync -rlhP /lib/ /vm_root/lib/
-      ${pkgs.rsync}/bin/rsync -rlhP /lib64/ /vm_root/lib64/
+      ${pkgs.rsync}/bin/rsync -rlhP /lib/ /vm.root/lib/
+      ${pkgs.rsync}/bin/rsync -rlhP /lib64/ /vm.root/lib64/
+      ${pkgs.libcap}/bin/setcap 'cap_setpcap+eip' ${pkgs.virtiofsd}/bin/virtiofsd
+      ${pkgs.libcap}/bin/setcap 'cap_net_admin,cap_net_raw+eip' ${pkgs.cloud-hypervisor}/bin/cloud-hypervisor
     '';
   };
 

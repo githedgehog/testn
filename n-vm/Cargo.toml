@@ -6,6 +6,9 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
+# internal
+n-vm-macros = { path = "../n-vm-macros" }
+
 # external
 cloud-hypervisor-client = "0.3.3"
 serde = { workspace = true, default-features = false, features = ["derive"] }

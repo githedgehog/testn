@@ -25,6 +25,8 @@ use serde_json::StreamDeserializer;
 use tokio_util::bytes::{Buf, BytesMut};
 use tracing::error;
 
+pub use n_vm_macros::in_vm;
+
 #[macro_export]
 macro_rules! fatal {
     ($msg:expr) => {
@@ -90,6 +92,7 @@ mod hypervisor {
 async fn launch_virtiofsd(path: impl AsRef<str>) -> tokio::process::Child {
     let uid = nix::unistd::getuid().as_raw();
     let gid = nix::unistd::getuid().as_raw();
+    // capctl::ambient::raise(capctl::Cap::NET_ADMIN).unwrap();
     tokio::process::Command::new("/bin/virtiofsd")
         .args([
             "--shared-dir".to_string(),
@@ -106,8 +109,8 @@ async fn launch_virtiofsd(path: impl AsRef<str>) -> tokio::process::Child {
             format!("--translate-gid=squash-host:0:{gid}:{MAX}", MAX = u32::MAX),
         ])
         .stdin(Stdio::null())
-        .stderr(Stdio::piped())
-        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .stdout(Stdio::inherit())
         .kill_on_drop(true)
         .spawn()
         .unwrap()
@@ -149,12 +152,11 @@ impl std::fmt::Display for VmTestOutput {
     }
 }
 
-pub async fn in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
+pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
     let test_name = std::any::type_name::<F>().trim_start_matches("&");
     let full_bin_name = std::env::args().next().unwrap(); // TODO: use /proc/self/exe readlink
     let (_share_path, bin_name) = full_bin_name.rsplit_once("/").unwrap();
-    let p = tokio::fs::read_link("/vm.root").await.unwrap();
-    let virtiofsd = launch_virtiofsd(p.as_path().to_str().unwrap()).await;
+    let virtiofsd = launch_virtiofsd("/vm.root").await;
     let listen = tokio::net::UnixListener::bind("/vm/vhost.vsock_123456").unwrap();
     let init_system_trace = tokio::spawn(async move {
         let (mut connection, _) = listen.accept().await.unwrap();
@@ -171,7 +173,7 @@ pub async fn in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
             firmware: None,
             kernel: Some("/bzImage".into()),
             cmdline: Some(format!(
-                "earlyprintk=ttyS0 console=ttyS0 ro rootfstype=virtiofs root=root default_hugepagesz=2M hugepagesz=2M hugepages=64 init=/init {full_bin_name} {test_name} --no-capture --format=terse"
+                "earlyprintk=hvc0 console=hvc0 ro rootfstype=virtiofs root=root default_hugepagesz=2M hugepagesz=2M hugepages=64 init=/bin/n-it {full_bin_name} {test_name} --no-capture --format=terse"
             )),
             ..Default::default()
         },
@@ -285,8 +287,8 @@ pub async fn in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
             format!("fd={EVENT_MONITOR_FD}").as_str(),
         ])
         .stdin(Stdio::null())
-        .stderr(Stdio::piped())
-        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .stdout(Stdio::inherit())
         .kill_on_drop(true)
         .fd_mappings(vec![FdMapping {
             parent_fd: event_sender,
@@ -462,7 +464,8 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
         .build()
         .unwrap();
     runtime.block_on(async {
-        const REQUIRED_CAPS: [&str; 6] = [
+        const REQUIRED_CAPS: [&str; 7] = [
+            "SETPCAP",
             "SYS_CHROOT", // for chroot (required by virtiofsd)
             "SYS_RAWIO", // for af-packet
             "IPC_LOCK", // for hugepages
@@ -471,11 +474,11 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
             "NET_BIND_SERVICE", // for vsockets
         ];
         const REQUIRED_DEVICES: [&str; 4] = ["/dev/kvm", "/dev/vhost-vsock", "/dev/vhost-net", "/dev/net/tun"];
-        const REQUIRED_FILES: [&str; 2] = [
+        const REQUIRED_FILES: [&str; 4] = [
             "/dev/kvm", // to launch vms
             "/dev/vhost-vsock", // for vsock communication with the vm
-            // "/dev/vhost-net", // for vhost communication with the vm (not yet needed)
-            // "/var/run/docker.sock", // allows the launch of sibling containers (may not be needed)
+            "/dev/vhost-net", // for network communication with the vm
+            "/var/run/docker.sock", // allows the launch of sibling containers (may not be needed)
         ];
         let (_, test_name) = std::any::type_name::<F>().split_once("::").unwrap();
         let bin_path = std::fs::read_link("/proc/self/exe").unwrap();
@@ -508,7 +511,7 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
                 entrypoint: None,
                 cmd: Some(args),
                 // TODO: this needs to be dynamic somehow.  Not sure how to do that yet.
-                image: Some("ghcr.io/githedgehog/testin/n-vm:latest".into()),
+                image: Some("ghcr.io/githedgehog/testin/n-vm:blessed".into()),
                 network_disabled: Some(true),
                 env: Some([
                     "IN_TEST_CONTAINER=YES".into(),
@@ -538,14 +541,6 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
                                 create_mountpoint: Some(true),
                                 ..Default::default()
                             }),
-                            ..Default::default()
-                        },
-                        // TODO: this needs to be built into the container
-                        bollard::models::Mount {
-                            source: Some(format!("/run/user/{uid}/vm_root/init")),
-                            target: Some("/vm.root/init".into()),
-                            typ: Some(bollard::secret::MountTypeEnum::BIND),
-                            read_only: Some(true),
                             ..Default::default()
                         },
                         bollard::models::Mount {
@@ -685,7 +680,7 @@ mod test {
                         let _init_span = tracing::span!(tracing::Level::INFO, "hypervisor");
                         let _guard = _init_span.enter();
                         eprintln!("--------------- Init ---------------");
-                        let output = super::in_vm(container_biscuit).await;
+                        let output = super::run_in_vm(container_biscuit).await;
                         eprintln!("{output}");
                         assert!(output.success);
                     });
@@ -717,5 +712,3 @@ mod test {
         }
     }
 }
-
-fn main() {}
