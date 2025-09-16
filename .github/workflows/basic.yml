@@ -58,6 +58,7 @@ jobs:
       - name: "scratch test"
         run: |
           docker pull ghcr.io/githedgehog/testn/n-vm:0.0.2
+          docker run --rm --cap-add=SYS_ADMIN busybox:latest sh -c "echo 4 > /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages && cat /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages"
           cat /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
           echo 4 | sudo tee /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
           cargo test --package=scratch
