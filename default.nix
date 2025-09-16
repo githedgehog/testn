@@ -12,17 +12,17 @@ let
       package,
       src,
       rustPlatform,
-      llvmPackages_21,
+      llvmPackages_20,
       rev ? get_version package,
     }:
     rustPlatform.buildRustPackage (final: {
       inherit src;
-      RUSTFLAGS = "-C link-arg=-fuse-ld=lld -C link-arg=-flto=fat -C opt-level=3 -C codegen-units=1 -C linker-plugin-lto -C lto=fat -C embed-bitcode=yes -C codegen-units=1 -C relro-level=full";
+      RUSTFLAGS = "-C opt-level=3 -C codegen-units=1 -C lto=fat -C embed-bitcode=yes -C relro-level=full";
       pname = package;
       version = rev;
       nativeBuildInputs = [
-        llvmPackages_21.clang
-        llvmPackages_21.lld
+        llvmPackages_20.clang
+        llvmPackages_20.lld
       ];
       buildAndTestSubdir = package;
       doCheck = false;
@@ -61,6 +61,7 @@ rec {
   };
   n-it.bin = build_fn "n-it";
   n-vm.bin = build_fn "n-vm";
+  p = pkgs;
   testn.container = pkgs.dockerTools.buildLayeredImage {
     name = "ghcr.io/githedgehog/testn/n-vm";
     tag = "latest";
@@ -99,15 +100,14 @@ rec {
         /vm.root/run \
         /vm.root/sys \
         /vm.root/tmp
-      ${pkgs.rsync}/bin/rsync -rLhP ${stdenv.cc.libc.out}/ /vm.root/${stdenv.cc.libc.out}/
+      ${pkgs.rsync}/bin/rsync --links -rhP ${stdenv.cc.libc.out}/ /vm.root/${stdenv.cc.libc.out}/
       ${pkgs.rsync}/bin/rsync -rLhP ${compiler-lib.lib}/ /vm.root/${compiler-lib.lib}/
-      ${pkgs.rsync}/bin/rsync -rLhP ${n-it.bin}/ /vm.root/${n-it.bin}/
+      ${pkgs.rsync}/bin/rsync --links -rhP ${n-it.bin}/ /vm.root/${n-it.bin}/
       ${pkgs.busybox}/bin/ln -s ${n-it.bin}/bin/n-it /vm.root/bin/n-it
       # populate symlinks or we can't find the dynamic linker
-      ${pkgs.rsync}/bin/rsync -rlhP /lib/ /vm.root/lib/
-      ${pkgs.rsync}/bin/rsync -rlhP /lib64/ /vm.root/lib64/
-      ${pkgs.libcap}/bin/setcap 'cap_setpcap+eip' ${pkgs.virtiofsd}/bin/virtiofsd
-      ${pkgs.libcap}/bin/setcap 'cap_net_admin,cap_net_raw+eip' ${pkgs.cloud-hypervisor}/bin/cloud-hypervisor
+      ${pkgs.rsync}/bin/rsync --links -rhP /lib/ /vm.root/lib/
+      ${pkgs.rsync}/bin/rsync --links -rhP /lib64/ /vm.root/lib64/
+      ${pkgs.libcap}/bin/setcap 'cap_net_admin+ep' ${pkgs.cloud-hypervisor}/bin/cloud-hypervisor
     '';
   };
 
