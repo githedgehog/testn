@@ -12,7 +12,7 @@ let
       package,
       src,
       rustPlatform,
-      llvmPackages_20,
+      llvmPackages_21,
       rev ? get_version package,
     }:
     rustPlatform.buildRustPackage (final: {
@@ -21,8 +21,8 @@ let
       pname = package;
       version = rev;
       nativeBuildInputs = [
-        llvmPackages_20.clang
-        llvmPackages_20.lld
+        llvmPackages_21.clang
+        llvmPackages_21.lld
       ];
       buildAndTestSubdir = package;
       doCheck = false;
@@ -100,14 +100,17 @@ rec {
         /vm.root/run \
         /vm.root/sys \
         /vm.root/tmp
-      ${pkgs.rsync}/bin/rsync --links -rhP ${stdenv.cc.libc.out}/ /vm.root/${stdenv.cc.libc.out}/
+      ${pkgs.rsync}/bin/rsync -rLhP ${stdenv.cc.libc.out}/ /vm.root/${stdenv.cc.libc.out}/
+      ${pkgs.rsync}/bin/rsync -rLhP ${compiler-lib}/ /vm.root/${compiler-lib}/
       ${pkgs.rsync}/bin/rsync -rLhP ${compiler-lib.lib}/ /vm.root/${compiler-lib.lib}/
-      ${pkgs.rsync}/bin/rsync --links -rhP ${n-it.bin}/ /vm.root/${n-it.bin}/
+      ${pkgs.rsync}/bin/rsync -rLhP ${n-it.bin}/ /vm.root/${n-it.bin}/
       ${pkgs.busybox}/bin/ln -s ${n-it.bin}/bin/n-it /vm.root/bin/n-it
       # populate symlinks or we can't find the dynamic linker
-      ${pkgs.rsync}/bin/rsync --links -rhP /lib/ /vm.root/lib/
-      ${pkgs.rsync}/bin/rsync --links -rhP /lib64/ /vm.root/lib64/
+      ${pkgs.rsync}/bin/rsync -rLhP /lib/ /vm.root/lib/
+      ${pkgs.rsync}/bin/rsync -rLhP /lib64/ /vm.root/lib64/
+      ${pkgs.busybox}/bin/ln -s . /vm.root/lib/x86_64-linux-gnu
       ${pkgs.libcap}/bin/setcap 'cap_net_admin+ep' ${pkgs.cloud-hypervisor}/bin/cloud-hypervisor
+      ${pkgs.busybox}/bin/chmod -R a+x /vm.root/
     '';
   };
 

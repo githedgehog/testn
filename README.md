@@ -26,7 +26,7 @@
 2. Pull the current docker image:
 
    ```bash
-   docker pull ghcr.io/githedgehog/testn/n-vm:0.0.2
+   docker pull ghcr.io/githedgehog/testn/n-vm:0.0.3
    ```
 
 3. Clone the repo

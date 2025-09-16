@@ -175,7 +175,7 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
             firmware: None,
             kernel: Some("/bzImage".into()),
             cmdline: Some(format!(
-                "earlyprintk=hvc0 console=hvc0 ro rootfstype=virtiofs root=root default_hugepagesz=2M hugepagesz=2M hugepages=32 init=/bin/n-it {full_bin_name} {test_name} --exact --no-capture --format=terse"
+                "earlyprintk=ttyS0 console=ttyS0 ro rootfstype=virtiofs root=root default_hugepagesz=2M hugepagesz=2M hugepages=32 init=/bin/n-it {full_bin_name} {test_name} --exact --no-capture --format=terse"
             )),
             ..Default::default()
         },
@@ -479,7 +479,7 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
             "/dev/kvm", // to launch vms
             "/dev/vhost-vsock", // for vsock communication with the vm
             "/dev/vhost-net", // for network communication with the vm
-            "/run/docker/docker.sock", // allows the launch of sibling containers (may not be needed)
+            "/var/run/docker.sock", // allows the launch of sibling containers (may not be needed)
         ];
         let (_, test_name) = std::any::type_name::<F>().split_once("::").unwrap();
         let bin_path = std::fs::read_link("/proc/self/exe").unwrap();

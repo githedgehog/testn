@@ -132,6 +132,7 @@ impl InitSystem {
             .stdout(console.try_clone().await.unwrap().into_std().await)
             .env("IN_VM", "YES")
             .env("PATH", "/bin")
+            .env("LD_LIBRARY_PATH", "/lib")
             .spawn()
             .unwrap();
 
