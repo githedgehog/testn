@@ -7,8 +7,6 @@ pub fn in_vm(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    println!("attr: {attr:#?}");
-    println!("input: {input:#?}");
     let x: syn::ItemFn = syn::parse(input.clone()).unwrap();
     let block = x.block;
     let vis = x.vis;
@@ -53,7 +51,6 @@ pub fn in_vm(
                                 .init();
                             let _init_span = ::tracing::span!(tracing::Level::INFO, "hypervisor");
                             let _guard = _init_span.enter();
-                            eprintln!("--------------- Init ---------------");
                             let output = ::n_vm::run_in_vm(#ident).await;
                             eprintln!("{output}");
                             assert!(output.success);

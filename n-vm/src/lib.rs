@@ -109,8 +109,8 @@ async fn launch_virtiofsd(path: impl AsRef<str>) -> tokio::process::Child {
             format!("--translate-gid=squash-host:0:{gid}:{MAX}", MAX = u32::MAX),
         ])
         .stdin(Stdio::null())
-        .stderr(Stdio::inherit())
-        .stdout(Stdio::inherit())
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
         .kill_on_drop(true)
         .spawn()
         .unwrap()
@@ -144,6 +144,8 @@ impl std::fmt::Display for VmTestOutput {
         writeln!(f, "{}", self.virtiofsd_stderr)?;
         writeln!(f, "--------------- linux console ---------------")?;
         writeln!(f, "{}", self.console)?;
+        writeln!(f, "--------------- init system ---------------")?;
+        writeln!(f, "{}", self.init_trace)?;
         writeln!(f, "--------------- test stdout ---------------")?;
         writeln!(f, "{}", self.stdout)?;
         writeln!(f, "--------------- test stderr ---------------")?;
@@ -173,7 +175,7 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
             firmware: None,
             kernel: Some("/bzImage".into()),
             cmdline: Some(format!(
-                "earlyprintk=hvc0 console=hvc0 ro rootfstype=virtiofs root=root default_hugepagesz=2M hugepagesz=2M hugepages=64 init=/bin/n-it {full_bin_name} {test_name} --no-capture --format=terse"
+                "earlyprintk=ttyS0 console=ttyS0 ro rootfstype=virtiofs root=root default_hugepagesz=2M hugepagesz=2M hugepages=64 init=/bin/n-it {full_bin_name} {test_name} --no-capture --format=terse"
             )),
             ..Default::default()
         },
@@ -287,8 +289,8 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
             format!("fd={EVENT_MONITOR_FD}").as_str(),
         ])
         .stdin(Stdio::null())
-        .stderr(Stdio::inherit())
-        .stdout(Stdio::inherit())
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
         .kill_on_drop(true)
         .fd_mappings(vec![FdMapping {
             parent_fd: event_sender,
@@ -679,7 +681,6 @@ mod test {
                             .init();
                         let _init_span = tracing::span!(tracing::Level::INFO, "hypervisor");
                         let _guard = _init_span.enter();
-                        eprintln!("--------------- Init ---------------");
                         let output = super::run_in_vm(container_biscuit).await;
                         eprintln!("{output}");
                         assert!(output.success);
