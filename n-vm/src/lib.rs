@@ -475,11 +475,12 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
             "NET_BIND_SERVICE", // for vsockets
         ];
         const REQUIRED_DEVICES: [&str; 4] = ["/dev/kvm", "/dev/vhost-vsock", "/dev/vhost-net", "/dev/net/tun"];
-        const REQUIRED_FILES: [&str; 4] = [
-            "/dev/kvm", // to launch vms
-            "/dev/vhost-vsock", // for vsock communication with the vm
-            "/dev/vhost-net", // for network communication with the vm
-            "/var/run/docker.sock", // allows the launch of sibling containers (may not be needed)
+        let docker_host = std::env::var("DOCKER_HOST").unwrap_or("/var/run/docker.sock".into()).trim_start_matches("unix://").to_string();
+        let required_files: [String; _] = [
+            "/dev/kvm".into(), // to launch vms
+            "/dev/vhost-vsock".into(), // for vsock communication with the vm
+            "/dev/vhost-net".into(), // for network communication with the vm
+            docker_host, // allows the launch of sibling containers (may not be needed)
         ];
         let (_, test_name) = std::any::type_name::<F>().split_once("::").unwrap();
         let bin_path = std::fs::read_link("/proc/self/exe").unwrap();
@@ -487,8 +488,8 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
         let client = bollard::Docker::connect_with_unix_defaults().unwrap();
         use std::os::unix::fs::MetadataExt;
         let cap_add = REQUIRED_CAPS.map(|cap| cap.into()).into();
-        let add_groups = REQUIRED_FILES
-            .map(|path| std::fs::metadata(path).unwrap_or_else(|e| panic!("error on {path}: {e}")).gid().to_string())
+        let add_groups = required_files
+            .map(|path| std::fs::metadata(&path).unwrap_or_else(|e| panic!("error on {path}: {e}")).gid().to_string())
             .into();
         let devices = REQUIRED_DEVICES
             .map(|path| DeviceMapping {
@@ -512,7 +513,7 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
                 entrypoint: None,
                 cmd: Some(args),
                 // TODO: this needs to be dynamic somehow.  Not sure how to do that yet.
-                image: Some("ghcr.io/githedgehog/testn/n-vm:0.0.3".into()),
+                image: Some("ghcr.io/githedgehog/testn/n-vm:0.0.4".into()),
                 network_disabled: Some(true),
                 env: Some([
                     "IN_TEST_CONTAINER=YES".into(),

@@ -57,10 +57,8 @@ jobs:
 
       - name: "scratch test"
         run: |
-          docker pull ghcr.io/githedgehog/testn/n-vm:0.0.3
-          docker run --privileged --rm --cap-add=SYS_ADMIN busybox:latest sh -c "echo 4 > /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages && cat /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages"
-          docker run --privileged --rm --cap-add=SYS_ADMIN busybox:latest sh -c "echo 256 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages && cat /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages"
-          false
+          docker pull ghcr.io/githedgehog/testn/n-vm:0.0.4
+          docker run --privileged --rm busybox:latest sh -c "echo 512 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages && cat /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages"
           cargo test --package=scratch
 
       - name: "build"

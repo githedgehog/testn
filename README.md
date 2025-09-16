@@ -13,31 +13,34 @@
 
 ## Steps
 
-1. Allocate some 1GiB hugepages:
-
-   If you don't already have some hugepages available, you can allocate 4 with the following command:
+1. Clone the repo
 
    ```bash
-   echo 4 | sudo tee /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
+   git clone https://github.com/githedgehog/testn
+   cd testn
+   ```
+
+2. Allocate some 2MiB hugepages:
+
+   If you don't already have some hugepages available, you can allocate 512 of them with the following command:
+
+   ```bash
+   echo 512 | sudo tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
    ```
 
    This will last until you reboot (or explicitly deallocate them).
 
-2. Pull the current docker image:
+3. Pull the current docker image:
 
    ```bash
-   docker pull ghcr.io/githedgehog/testn/n-vm:0.0.3
-   ```
-
-3. Clone the repo
-
-   ```bash
-   git clone https://github.com/githedgehog/testn
+   docker pull ghcr.io/githedgehog/testn/n-vm:0.0.4
    ```
 
 4. Change into the repo directory and run the scratch test
 
    ```bash
-   cd testn
    cargo test --package=scratch
    ```
+
+If all goes well you should see two tests pass and two tests fail.
+The tests which fail exist to illustrate the type of output we get from a failed in-vm and non in-vm test.
