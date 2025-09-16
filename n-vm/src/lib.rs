@@ -175,7 +175,7 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
             firmware: None,
             kernel: Some("/bzImage".into()),
             cmdline: Some(format!(
-                "earlyprintk=ttyS0 console=ttyS0 ro rootfstype=virtiofs root=root default_hugepagesz=2M hugepagesz=2M hugepages=64 init=/bin/n-it {full_bin_name} {test_name} --no-capture --format=terse"
+                "earlyprintk=ttyS0 console=ttyS0 ro rootfstype=virtiofs root=root default_hugepagesz=2M hugepagesz=2M hugepages=32 init=/bin/n-it {full_bin_name} {test_name} --exact --no-capture --format=terse"
             )),
             ..Default::default()
         },
@@ -197,11 +197,11 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
             ..Default::default()
         }),
         memory: Some(MemoryConfig {
-            size: 1 * 1024 * 1024 * 1024, // 1 GiB
+            size: 256 * 1024 * 1024, // 256MiB
             mergeable: Some(true),
             shared: Some(true),
             hugepages: Some(true),
-            hugepage_size: Some(1024 * 1024 * 1024), // 1GiB
+            hugepage_size: Some(2 * 1024 * 1024), // 2MiB
             thp: Some(true),
             ..Default::default()
         }),
@@ -479,7 +479,7 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
             "/dev/kvm", // to launch vms
             "/dev/vhost-vsock", // for vsock communication with the vm
             "/dev/vhost-net", // for network communication with the vm
-            "/var/run/docker.sock", // allows the launch of sibling containers (may not be needed)
+            "/run/docker/docker.sock", // allows the launch of sibling containers (may not be needed)
         ];
         let (_, test_name) = std::any::type_name::<F>().split_once("::").unwrap();
         let bin_path = std::fs::read_link("/proc/self/exe").unwrap();
@@ -488,7 +488,7 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
         use std::os::unix::fs::MetadataExt;
         let cap_add = REQUIRED_CAPS.map(|cap| cap.into()).into();
         let add_groups = REQUIRED_FILES
-            .map(|path| std::fs::metadata(path).unwrap().gid().to_string())
+            .map(|path| std::fs::metadata(path).unwrap_or_else(|e| panic!("error on {path}: {e}")).gid().to_string())
             .into();
         let devices = REQUIRED_DEVICES
             .map(|path| DeviceMapping {
@@ -505,14 +505,14 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
         let gid = nix::unistd::getgid().as_raw();
         let container = client.create_container(
             Some(CreateContainerOptions {
-                name: "science".to_string().into(),
+                name: None,
                 platform: "x86-64".into(),
             }),
             ContainerCreateBody {
                 entrypoint: None,
                 cmd: Some(args),
                 // TODO: this needs to be dynamic somehow.  Not sure how to do that yet.
-                image: Some("ghcr.io/githedgehog/testin/n-vm:0.0.1".into()),
+                image: Some("ghcr.io/githedgehog/testn/n-vm:0.0.3".into()),
                 network_disabled: Some(true),
                 env: Some([
                     "IN_TEST_CONTAINER=YES".into(),

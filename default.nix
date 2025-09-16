@@ -17,9 +17,13 @@ let
     }:
     rustPlatform.buildRustPackage (final: {
       inherit src;
+      RUSTFLAGS = "-C link-arg=-fuse-ld=lld -C link-arg=-flto=fat -C opt-level=3 -C codegen-units=1 -C linker-plugin-lto -C lto=fat -C embed-bitcode=yes -C codegen-units=1 -C relro-level=full";
       pname = package;
       version = rev;
-      nativeBuildInputs = [ llvmPackages_21.clang ];
+      nativeBuildInputs = [
+        llvmPackages_21.clang
+        llvmPackages_21.lld
+      ];
       buildAndTestSubdir = package;
       doCheck = false;
       cargoLock = {
@@ -57,8 +61,8 @@ rec {
   };
   n-it.bin = build_fn "n-it";
   n-vm.bin = build_fn "n-vm";
-  n-vm.container = pkgs.dockerTools.buildLayeredImage {
-    name = "ghcr.io/githedgehog/testin/n-vm";
+  testn.container = pkgs.dockerTools.buildLayeredImage {
+    name = "ghcr.io/githedgehog/testn/n-vm";
     tag = "latest";
     enableFakechroot = true;
     contents = [
