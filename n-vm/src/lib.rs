@@ -466,8 +466,7 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
         .build()
         .unwrap();
     runtime.block_on(async {
-        const REQUIRED_CAPS: [&str; 7] = [
-            "SETPCAP",
+        const REQUIRED_CAPS: [&str; 6] = [
             "SYS_CHROOT", // for chroot (required by virtiofsd)
             "SYS_RAWIO", // for af-packet
             "IPC_LOCK", // for hugepages

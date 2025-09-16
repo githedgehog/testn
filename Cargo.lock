@@ -829,7 +829,7 @@ dependencies = [
 
 [[package]]
 name = "n-it"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "nix 0.30.1",
  "tokio",
@@ -841,7 +841,7 @@ dependencies = [
 
 [[package]]
 name = "n-vm"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "bollard",
  "capctl",
@@ -862,7 +862,7 @@ dependencies = [
 
 [[package]]
 name = "n-vm-macros"
-version = "0.0.0"
+version = "0.0.2"
 dependencies = [
  "proc-macro2",
  "quote",

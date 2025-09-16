@@ -12,14 +12,14 @@ let
       package,
       src,
       rustPlatform,
-      llvmPackages,
+      llvmPackages_21,
       rev ? get_version package,
     }:
     rustPlatform.buildRustPackage (final: {
       inherit src;
       pname = package;
       version = rev;
-      nativeBuildInputs = [ llvmPackages.clang ];
+      nativeBuildInputs = [ llvmPackages_21.clang ];
       buildAndTestSubdir = package;
       doCheck = false;
       cargoLock = {
@@ -47,13 +47,13 @@ let
 in
 rec {
   linux = pkgs.linuxManualConfig rec {
-    version = "6.12.44";
+    version = "6.12.47";
     src = fetchTarball {
       url = "https://cdn.kernel.org/pub/linux/kernel/v${pkgs.lib.versions.major version}.x/linux-${version}.tar.xz";
-      sha256 = "sha256:05ad3hkpsdvn1dnzcxzasg1ag8x8rlp6jcz2lhlslr0z3sc3pfaf";
+      sha256 = "sha256:0cb2hqrz1rvqsvr0s7q61525ig57l8hzgaajjcyhg3x0fqsy4avm";
     };
     configfile = ./linux/kernel.config;
-    inherit stdenv;
+    inherit (pkgs.llvmPackages_21) stdenv;
   };
   n-it.bin = build_fn "n-it";
   n-vm.bin = build_fn "n-vm";

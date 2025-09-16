@@ -8,8 +8,8 @@ mod test {
 
     #[test]
     #[in_vm]
-    fn biscuit() {
+    fn science_time() {
         assert_eq!(2 + 2, 4);
-        // panic!("oh no");
+        assert!(false, "oh no!");
     }
 }
