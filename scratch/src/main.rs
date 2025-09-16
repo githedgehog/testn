@@ -10,6 +10,6 @@ mod test {
     #[in_vm]
     fn biscuit() {
         assert_eq!(2 + 2, 4);
-        panic!("oh no");
+        // panic!("oh no");
     }
 }
