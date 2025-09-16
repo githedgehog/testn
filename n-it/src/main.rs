@@ -124,6 +124,7 @@ impl InitSystem {
 
         args.next().unwrap(); // skip self
 
+        // TODO: convert from using hvc0 to using a vsock
         let child = Command::new(args.next().unwrap())
             .args(args)
             .kill_on_drop(true)
@@ -133,6 +134,7 @@ impl InitSystem {
             .env("IN_VM", "YES")
             .env("PATH", "/bin")
             .env("LD_LIBRARY_PATH", "/lib")
+            .env("RUST_BACKTRACE", "1")
             .spawn()
             .unwrap();
 
@@ -249,7 +251,10 @@ impl InitSystem {
             debug!("umounting {mount_point}");
             sync();
             loop {
-                match nix::mount::umount2(mount_point, MntFlags::MNT_DETACH) {
+                match nix::mount::umount2(
+                    mount_point,
+                    MntFlags::MNT_DETACH | MntFlags::UMOUNT_NOFOLLOW,
+                ) {
                     Ok(()) => {
                         debug!("successfully unmounted {mount_point}");
                         sync();
@@ -474,6 +479,9 @@ impl<'a> MakeWriter<'a> for VsockWriter {
 unsafe impl Send for VsockWriter {}
 unsafe impl Sync for VsockWriter {}
 
+// arbitrary port for tracing vsock connection
+const INIT_SYSTEM_VSOCK_PORT: u32 = 123_456;
+
 fn main() -> Infallible {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_io()
@@ -488,7 +496,7 @@ fn main() -> Infallible {
         .unwrap();
     runtime.block_on(async {
         eprintln!("init system runtime started: connecting to tracing vsock");
-        let tracing_addr = vsock::VsockAddr::new(VMADDR_CID_HOST, 123456);
+        let tracing_addr = vsock::VsockAddr::new(VMADDR_CID_HOST, INIT_SYSTEM_VSOCK_PORT);
         let tracing_vsock = VsockWriter(RefCell::new(
             vsock::VsockStream::connect(&tracing_addr).unwrap(),
         ));

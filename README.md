@@ -33,7 +33,7 @@
 3. Pull the current docker image:
 
    ```bash
-   docker pull ghcr.io/githedgehog/testn/n-vm:0.0.4
+   docker pull ghcr.io/githedgehog/testn/n-vm:0.0.5
    ```
 
 4. Change into the repo directory and run the scratch test

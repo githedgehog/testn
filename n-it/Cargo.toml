@@ -1,6 +1,6 @@
 [package]
 name = "n-it"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2024"
 license = "Apache-2.0"
 publish = false
@@ -8,9 +8,10 @@ publish = false
 [dependencies]
 
 # external
+capctl = { workspace = true, default-features = false, features = [] }
 nix = { workspace = true, default-features = false, features = ["signal", "mount", "reboot", "fs"] }
 tokio = { workspace = true, default-features = false, features = ["rt", "process", "signal", "time", "macros", "fs", "sync", "net", "io-util"] }
 tokio-vsock = { workspace = true, default-features = false, features = [] }
-vsock = { workspace = true, default-features = false, features = [] }
 tracing = { workspace = true, default-features = false, features = ["attributes"] }
 tracing-subscriber = { workspace = true, default-features = false, features = ["fmt"] }
+vsock = { workspace = true, default-features = false, features = [] }

@@ -8,16 +8,16 @@ mod test {
 
     #[test]
     #[in_vm]
-    fn science_time() {
+    fn test_which_runs_in_vm() {
         assert_eq!(2 + 2, 4);
-        // assert!(false, "oh no!");
     }
 
+    #[should_panic]
     #[test]
     #[in_vm]
-    fn science_time_control() {
+    fn test_which_runs_in_vm_control() {
         assert_eq!(2 + 2, 4);
-        assert!(false, "oh no!");
+        assert!(false, "deliberate panic");
     }
 
     #[test]
@@ -25,9 +25,10 @@ mod test {
         assert_eq!(2 + 2, 4);
     }
 
+    #[should_panic]
     #[test]
     fn test_which_does_not_run_in_vm_control() {
         assert_eq!(2 + 2, 4);
-        assert!(false, "oh no!");
+        assert!(false, "deliberate panic");
     }
 }

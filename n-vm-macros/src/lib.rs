@@ -4,7 +4,7 @@ use quote::quote;
 
 #[proc_macro_attribute]
 pub fn in_vm(
-    attr: proc_macro::TokenStream,
+    _attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     let x: syn::ItemFn = syn::parse(input.clone()).unwrap();
@@ -31,11 +31,6 @@ pub fn in_vm(
                         let runtime = ::tokio::runtime::Builder::new_current_thread()
                             .enable_io()
                             .enable_time()
-                            // .thread_name_fn(|| {
-                            //     static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
-                            //     let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-                            //     format!("hypervisor-{}", id)
-                            // })
                             .build()
                             .unwrap();
                         let _guard = runtime.enter();
@@ -61,7 +56,7 @@ pub fn in_vm(
             }
             eprintln!("•─────⋅☾☾☾☾BEGIN NESTED TEST ENVIRONMENT☽☽☽☽⋅─────•");
             let container_state = ::n_vm::run_test_in_vm(#ident);
-            eprintln!("•─────⋅☾☾☾☾END NESTED TEST ENVIRONMENT☽☽☽☽⋅─────•");
+            eprintln!("•─────⋅☾☾☾☾ END NESTED TEST ENVIRONMENT ☽☽☽☽⋅─────•");
             if let Some(code) = container_state.exit_code {
                 if code != 0 {
                     panic!("test container exited with code {code}");
