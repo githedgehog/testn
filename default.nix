@@ -51,10 +51,10 @@ let
 in
 rec {
   linux = pkgs.linuxManualConfig rec {
-    version = "6.12.47";
+    version = "6.12.49";
     src = fetchTarball {
       url = "https://cdn.kernel.org/pub/linux/kernel/v${pkgs.lib.versions.major version}.x/linux-${version}.tar.xz";
-      sha256 = "sha256:0cb2hqrz1rvqsvr0s7q61525ig57l8hzgaajjcyhg3x0fqsy4avm";
+      sha256 = "sha256:0nxbwcyb1shfw9s833agk32zh133xzqxpw7j4fzdskzl1x65jaws";
     };
     configfile = ./linux/kernel.config;
     inherit (pkgs.llvmPackages_21) stdenv;
