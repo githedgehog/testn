@@ -22,10 +22,11 @@
 
 2. Allocate some 2MiB hugepages:
 
-   If you don't already have some hugepages available, you can allocate 512 of them with the following command:
+   If you don't already have some hugepages available, you can allocate 1024 of
+   them with the following command:
 
    ```bash
-   echo 512 | sudo tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+   sudo tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages <<< 1024
    ```
 
    This will last until you reboot (or explicitly deallocate them).
@@ -43,4 +44,5 @@
    ```
 
 If all goes well you should see two tests pass and two tests fail.
-The tests which fail exist to illustrate the type of output we get from a failed in-vm and non in-vm test.
+The tests which fail exist to illustrate the type of output we get from a failed
+in-vm and non in-vm test.

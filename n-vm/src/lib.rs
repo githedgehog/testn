@@ -175,7 +175,7 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
             firmware: None,
             kernel: Some("/bzImage".into()),
             cmdline: Some(format!(
-                "earlyprintk=ttyS0 console=ttyS0 ro rootfstype=virtiofs root=root default_hugepagesz=2M hugepagesz=2M hugepages=32 init=/bin/n-it {full_bin_name} {test_name} --exact --no-capture --format=terse"
+                "earlyprintk=ttyS0 console=ttyS0 ro rootfstype=virtiofs root=root default_hugepagesz=2M hugepagesz=2M hugepages=16 init=/bin/n-it {full_bin_name} {test_name} --exact --no-capture --format=terse"
             )),
             ..Default::default()
         },
@@ -197,7 +197,7 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
             ..Default::default()
         }),
         memory: Some(MemoryConfig {
-            size: 256 * 1024 * 1024, // 256MiB
+            size: 512 * 1024 * 1024, // 512mib
             mergeable: Some(true),
             shared: Some(true),
             hugepages: Some(true),
