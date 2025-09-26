@@ -9,7 +9,6 @@ use bollard::secret::{
     ContainerCreateBody, ContainerState, DeviceMapping, HostConfig, MountBindOptions,
     RestartPolicy, RestartPolicyNameEnum,
 };
-use cloud_hypervisor_client::SocketBasedApiClient;
 use cloud_hypervisor_client::apis::DefaultApi;
 use cloud_hypervisor_client::models::console_config::Mode;
 use cloud_hypervisor_client::models::{
@@ -23,7 +22,7 @@ use tokio_stream::StreamExt;
 use command_fds::{CommandFdExt, FdMapping};
 use serde_json::StreamDeserializer;
 use tokio_util::bytes::{Buf, BytesMut};
-use tracing::error;
+use tracing::{debug, error};
 
 pub use n_vm_macros::in_vm;
 
@@ -161,13 +160,28 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
     let virtiofsd = launch_virtiofsd("/vm.root").await;
     let listen = tokio::net::UnixListener::bind("/vm/vhost.vsock_123456").unwrap();
     let init_system_trace = tokio::spawn(async move {
+        const CAPACITY_GUESS: usize = 32_768;
+        let mut init_system_trace = Vec::with_capacity(CAPACITY_GUESS);
         let (mut connection, _) = listen.accept().await.unwrap();
-        let mut init_system_trace = String::with_capacity(32_768);
-        connection
-            .read_to_string(&mut init_system_trace)
-            .await
-            .unwrap();
-        init_system_trace
+        loop {
+            tokio::select! {
+                res = connection.read_buf(&mut init_system_trace) => {
+                    match res {
+                        Ok(bytes) => {
+                            if bytes == 0 {
+                                break;
+                            }
+                            tokio::task::yield_now().await;
+                        },
+                        Err(e) => {
+                            error!("{e}");
+                            break;
+                        },
+                    }
+                }
+            };
+        }
+        String::from_utf8_lossy(&init_system_trace).to_string()
     });
     let (_, test_name) = test_name.split_once("::").unwrap();
     let config = VmConfig {
@@ -197,7 +211,7 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
             ..Default::default()
         }),
         memory: Some(MemoryConfig {
-            size: 512 * 1024 * 1024, // 512mib
+            size: 512 * 1024 * 1024, // 512MiB
             mergeable: Some(true),
             shared: Some(true),
             hugepages: Some(true),
@@ -323,9 +337,24 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
     let client = Arc::new(tokio::sync::Mutex::new(
         cloud_hypervisor_client::socket_based_api_client(vmm_socket_path),
     ));
-    let hypervisor_event_logs_success =
-        tokio::spawn(watch_hypervisor(event_receiver, client.clone()));
+    let mut loops = 0;
+    loop {
+        match tokio::fs::try_exists(vmm_socket_path).await {
+            Ok(true) => break,
+            Ok(false) => {
+                loops += 1;
+                if loops > 100 {
+                    panic!("failed to communicate with hypervisor: no api socket found");
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+            Err(err) => {
+                panic!("unable to communicate with hypervisor: {err}");
+            }
+        }
+    }
     client.lock().await.create_vm(config).await.unwrap();
+    let hypervisor_watch = tokio::spawn(watch_hypervisor(event_receiver));
     let kernel_log = tokio::task::spawn(async move {
         let mut loops = 0;
         while loops < 100 {
@@ -348,11 +377,31 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
         kernel_log
     });
     client.lock().await.boot_vm().await.unwrap();
-    let (hypervisor_events, hypervisor_verdict) = hypervisor_event_logs_success.await.unwrap();
+    let init_trace = match init_system_trace.await {
+        Ok(log) => log,
+        Err(err) => {
+            format!("unable to join init system task: {err}")
+        }
+    };
+    let (hypervisor_events, hypervisor_verdict) = hypervisor_watch.await.unwrap();
     let hypervisor_output = process.wait_with_output().await.unwrap();
     let kernel_log = kernel_log
         .await
         .unwrap_or_else(|err| format!("!!!KERNEL LOG MISSING!!!:\n\n{err:#?}\n\n"));
+
+    match client.lock().await.shutdown_vm().await {
+        Ok(()) => {}
+        Err(err) => {
+            debug!("vm shutdown: {err}");
+        }
+    };
+    match client.lock().await.shutdown_vmm().await {
+        Ok(()) => {}
+        Err(err) => {
+            debug!("vmm shutdown: {err}");
+        }
+    }
+
     let virtiofsd = virtiofsd.wait_with_output().await.unwrap();
     VmTestOutput {
         success: virtiofsd.status.success()
@@ -361,7 +410,7 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
         stdout: String::from_utf8_lossy(&hypervisor_output.stdout).to_string(),
         stderr: String::from_utf8_lossy(&hypervisor_output.stderr).to_string(),
         console: kernel_log.clone(),
-        init_trace: init_system_trace.await.unwrap(),
+        init_trace,
         virtiofsd_stdout: String::from_utf8_lossy(virtiofsd.stdout.as_slice()).to_string(),
         virtiofsd_stderr: String::from_utf8_lossy(virtiofsd.stderr.as_slice()).to_string(),
         hypervisor_events: hypervisor_events,
@@ -421,7 +470,6 @@ where
 
 async fn watch_hypervisor(
     receiver: tokio::net::unix::pipe::Receiver,
-    client: Arc<tokio::sync::Mutex<SocketBasedApiClient>>,
 ) -> (Vec<hypervisor::Event>, bool) {
     let decoder = AsyncJsonStreamDecoder::new();
 
@@ -447,16 +495,13 @@ async fn watch_hypervisor(
                 };
             }
             Some(Err(e)) => {
-                success = false;
                 error!("{e:#?}");
+            }
+            None => {
                 break;
             }
-            None => {}
         }
     }
-    let client = client.lock().await;
-    client.shutdown_vm().await.unwrap();
-    client.shutdown_vmm().await.unwrap();
     return (hlog, success);
 }
 
