@@ -61,10 +61,10 @@ jobs:
           nix-channel --update
           nix build -f default.nix testn.container
           docker load < ./result
-          docker build --tag ghcr.io/githedgehog/testn/n-vm:v0.0.6 .
+          docker build --tag ghcr.io/githedgehog/testn/n-vm:v0.0.7 .
           docker run --privileged --rm busybox:latest sh -c "echo 1024 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages && cat /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages"
           cargo test --package=scratch
-          docker push ghcr.io/githedgehog/testn/n-vm:v0.0.6
+          docker push ghcr.io/githedgehog/testn/n-vm:v0.0.7
 
       - name: "Setup tmate session for debug"
         if: ${{ failure() && github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
