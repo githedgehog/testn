@@ -72,7 +72,7 @@ impl InitSystem {
             "/tmp",
             Some("tmpfs"),
             MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
-            Some("mode=0300,size=5%"),
+            Some("mode=0600,size=5%"),
         ) {
             fail_to_mount("/tmp", e)
         };
@@ -84,7 +84,7 @@ impl InitSystem {
             "/run",
             Some("tmpfs"),
             MsFlags::MS_NOSUID | MsFlags::MS_NOEXEC | MsFlags::MS_NODEV,
-            Some("mode=0300,size=5%"),
+            Some("mode=0600,size=5%"),
         ) {
             fail_to_mount("/run", e)
         }
