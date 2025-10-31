@@ -189,7 +189,7 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
             firmware: None,
             kernel: Some("/bzImage".into()),
             cmdline: Some(format!(
-                "earlyprintk=ttyS0 console=ttyS0 ro rootfstype=virtiofs root=root default_hugepagesz=2M hugepagesz=2M hugepages=16 init=/bin/n-it {full_bin_name} {test_name} --exact --no-capture --format=terse"
+                "iommu=on intel_iommu=on amd_iommu=on vfio.enable_unsafe_noiommu_mode=1 earlyprintk=ttyS0 console=ttyS0 ro rootfstype=virtiofs root=root default_hugepagesz=2M hugepagesz=2M hugepages=16 init=/bin/n-it {full_bin_name} {test_name} --exact --no-capture --format=terse"
             )),
             ..Default::default()
         },
