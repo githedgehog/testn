@@ -413,7 +413,7 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
         init_trace,
         virtiofsd_stdout: String::from_utf8_lossy(virtiofsd.stdout.as_slice()).to_string(),
         virtiofsd_stderr: String::from_utf8_lossy(virtiofsd.stderr.as_slice()).to_string(),
-        hypervisor_events: hypervisor_events,
+        hypervisor_events,
     }
 }
 
@@ -429,6 +429,15 @@ where
         Self {
             _phantom: std::marker::PhantomData,
         }
+    }
+}
+
+impl<'a, T> Default for AsyncJsonStreamDecoder<'a, T>
+where
+    T: Deserialize<'a>,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -502,7 +511,7 @@ async fn watch_hypervisor(
             }
         }
     }
-    return (hlog, success);
+    (hlog, success)
 }
 
 pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
@@ -562,7 +571,7 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
                 network_disabled: Some(true),
                 env: Some([
                     "IN_TEST_CONTAINER=YES".into(),
-                    // format!("RUST_BACKTRACE=1"),
+                    "RUST_BACKTRACE=1".into(),
                 ].into()),
                 user: Some(format!("{uid}:{gid}")),
                 host_config: Some(HostConfig {
@@ -579,7 +588,7 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
                     mounts: Some([
                         bollard::models::Mount {
                             source: Some(bin_dir.to_str().unwrap().into()),
-                            target: Some(format!("{}", bin_dir.to_str().unwrap()).into()),
+                            target: Some(bin_dir.to_str().unwrap().into()),
                             typ: Some(bollard::secret::MountTypeEnum::BIND),
                             read_only: Some(true),
                             bind_options: Some(MountBindOptions {
@@ -592,7 +601,7 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
                         },
                         bollard::models::Mount {
                             source: Some(bin_dir.to_str().unwrap().into()),
-                            target: Some(format!("/vm.root/{}", bin_dir.to_str().unwrap()).into()),
+                            target: Some(format!("/vm.root/{}", bin_dir.to_str().unwrap())),
                             typ: Some(bollard::secret::MountTypeEnum::BIND),
                             read_only: Some(true),
                             bind_options: Some(MountBindOptions {
@@ -637,14 +646,14 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
                     bollard::container::LogOutput::StdErr { message } => {
                         eprint!(
                             "{message}",
-                            message = String::from_utf8_lossy(&message.to_vec())
+                            message = String::from_utf8_lossy(&message)
                         );
                     }
                     bollard::container::LogOutput::StdOut { message }
                     | bollard::container::LogOutput::Console { message } => {
                         print!(
                             "{message}",
-                            message = String::from_utf8_lossy(&message.to_vec())
+                            message = String::from_utf8_lossy(&message)
                         );
                     }
                     bollard::container::LogOutput::StdIn { .. } => unreachable!(),
@@ -747,14 +756,12 @@ mod test {
             } else {
                 eprintln!("test container did not return an exit code");
             }
-        } else {
-            if let Some(code) = container_state.exit_code {
-                if code != 0 {
-                    panic!("test container exited with code {code}");
-                }
-            } else {
-                panic!("test container not return an exit code");
+        } else if let Some(code) = container_state.exit_code {
+            if code != 0 {
+                panic!("test container exited with code {code}");
             }
+        } else {
+            panic!("test container not return an exit code");
         }
     }
 }

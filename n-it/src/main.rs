@@ -339,7 +339,7 @@ impl InitSystem {
         debug!("signal handlers registered");
 
         // Mount essential filesystems
-        tokio::task::spawn_blocking(|| Self::mount_essential_filesystems())
+        tokio::task::spawn_blocking(Self::mount_essential_filesystems)
             .await
             .unwrap()
             .unwrap();
@@ -450,7 +450,7 @@ impl InitSystem {
                 children.push(Pid::from_raw(pid as i32));
             }
         }
-        return children;
+        children
     }
 }
 
