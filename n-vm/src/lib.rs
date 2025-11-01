@@ -280,7 +280,7 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
             ..Default::default()
         }),
         pvpanic: Some(true),
-        landlock_enable: Some(false),
+        landlock_enable: Some(true),
         landlock_rules: Some(vec![LandlockConfig {
             path: "/vm".into(),
             access: "rw".into(),
