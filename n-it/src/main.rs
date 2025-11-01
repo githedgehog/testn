@@ -304,7 +304,7 @@ impl InitSystem {
         .await
         {
             Ok(_) => {
-                // normaly I would use unreachable!() here, but in this case
+                // normally I would use unreachable!() here, but in this case
                 // it is better to use fatal!() to help ensure that stdio is flushed.
                 fatal!("unreachable code?");
             }
