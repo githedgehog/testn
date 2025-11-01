@@ -6,7 +6,6 @@ members = [
     "n-it",
     "n-vm",
     "n-vm-macros",
-    "scratch",
 ]
 
 [workspace.dependencies]
