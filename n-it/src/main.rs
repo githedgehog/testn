@@ -141,7 +141,7 @@ impl InitSystem {
         if let Some(pid) = child.id() {
             debug!("main process spawned with PID: {pid}");
         } else {
-            fatal!("unable to determine main processs id");
+            fatal!("unable to determine main PID");
         }
         (console, child)
     }
