@@ -14,6 +14,7 @@
       # for dev
       bash
       docker-client
+      rust-analyzer-unwrapped
       rustup
     ]);
   runScript = ''bash'';
