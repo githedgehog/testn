@@ -615,7 +615,7 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
                     ].into()),
                     tmpfs: Some({
                         let mut map = std::collections::HashMap::new();
-                        map.insert("/vm".into(), format!("nodev,noexec,nosuid,mode=0300,uid={uid},gid={gid}"));
+                        map.insert("/vm".into(), format!("nodev,noexec,nosuid,uid={uid},gid={gid}"));
                         map
                     }),
                     privileged: Some(false),
