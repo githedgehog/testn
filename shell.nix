@@ -14,6 +14,13 @@
       # for dev
       bash
       docker-client
+      llvmPackages.clang
+      llvmPackages.lld
+      stdenv.cc.libc.dev
+      glibc.dev
+      glibc.out
+      libgcc.libgcc
+      cargo
       rust-analyzer-unwrapped
       rustup
     ]);

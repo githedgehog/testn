@@ -12,7 +12,7 @@ let
       package,
       src,
       rustPlatform,
-      llvmPackages_21,
+      llvmPackages_22,
       rev ? get_version package,
     }:
     rustPlatform.buildRustPackage (final: {
@@ -21,8 +21,8 @@ let
       pname = package;
       version = rev;
       nativeBuildInputs = [
-        llvmPackages_21.clang
-        llvmPackages_21.lld
+        llvmPackages_22.clang
+        llvmPackages_22.lld
       ];
       buildAndTestSubdir = package;
       doCheck = false;
