@@ -1,11 +1,11 @@
 [package]
 name = "n-vm"
-version = "0.0.9"
+version = "0.0.10"
 edition = "2024"
 license = "Apache-2.0"
 publish = false
 
-[dependencies]
+[target.'cfg(unix)'.dependencies]
 # internal
 n-vm-macros = { path = "../n-vm-macros" }
 
