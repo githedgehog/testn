@@ -5,15 +5,15 @@ use std::time::Duration;
 use bollard::query_parameters::{
     CreateContainerOptions, InspectContainerOptions, RemoveContainerOptions, StartContainerOptions,
 };
-use bollard::secret::{
+use bollard::models::{
     ContainerCreateBody, ContainerState, DeviceMapping, HostConfig, MountBindOptions,
     RestartPolicy, RestartPolicyNameEnum,
 };
 use cloud_hypervisor_client::apis::DefaultApi;
-use cloud_hypervisor_client::models::console_config::Mode;
+use cloud_hypervisor_client::models::ConsoleMode;
 use cloud_hypervisor_client::models::{
     ConsoleConfig, CpuTopology, CpusConfig, FsConfig, LandlockConfig, MemoryConfig, NetConfig,
-    PayloadConfig, PlatformConfig, VmConfig, VsockConfig,
+    PayloadConfig, PlatformConfig, SerialConfig, VmConfig, VsockConfig,
 };
 use serde::Deserialize;
 use tokio::io::AsyncReadExt;
@@ -262,10 +262,10 @@ pub async fn run_in_vm<F: FnOnce()>(_: F) -> VmTestOutput {
             id: Some("root".into()),
             ..Default::default()
         }]),
-        console: Some(ConsoleConfig::new(Mode::Tty)),
-        serial: Some(ConsoleConfig {
-            // mode: Mode::File,
-            mode: Mode::Socket,
+        console: Some(ConsoleConfig::new(ConsoleMode::Tty)),
+        serial: Some(SerialConfig {
+            // mode: ConsoleMode::File,
+            mode: ConsoleMode::Socket,
             // file: Some("/vm/kernel.log".into()),
             socket: Some("/vm/kernel.sock".into()),
             ..Default::default()
@@ -589,10 +589,10 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
                         bollard::models::Mount {
                             source: Some(bin_dir.to_str().unwrap().into()),
                             target: Some(bin_dir.to_str().unwrap().into()),
-                            typ: Some(bollard::secret::MountTypeEnum::BIND),
+                            typ: Some(bollard::models::MountType::BIND),
                             read_only: Some(true),
                             bind_options: Some(MountBindOptions {
-                                propagation: Some(bollard::secret::MountBindOptionsPropagationEnum::PRIVATE),
+                                propagation: Some(bollard::models::MountBindOptionsPropagationEnum::PRIVATE),
                                 non_recursive: Some(true),
                                 create_mountpoint: Some(true),
                                 ..Default::default()
@@ -602,10 +602,10 @@ pub fn run_test_in_vm<F: FnOnce()>(_test_fn: F) -> ContainerState {
                         bollard::models::Mount {
                             source: Some(bin_dir.to_str().unwrap().into()),
                             target: Some(format!("/vm.root/{}", bin_dir.to_str().unwrap())),
-                            typ: Some(bollard::secret::MountTypeEnum::BIND),
+                            typ: Some(bollard::models::MountType::BIND),
                             read_only: Some(true),
                             bind_options: Some(MountBindOptions {
-                                propagation: Some(bollard::secret::MountBindOptionsPropagationEnum::PRIVATE),
+                                propagation: Some(bollard::models::MountBindOptionsPropagationEnum::PRIVATE),
                                 non_recursive: Some(true),
                                 create_mountpoint: Some(true),
                                 ..Default::default()
